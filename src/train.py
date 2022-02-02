@@ -28,8 +28,8 @@ args = parser.parse_args()
 if __name__ == '__main__':
 
     # Define the destination device for training
-    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'\nDevice being used: {DEVICE}\n')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'\nDevice being used: {device}\n')
     
     # Define the loss function
     criterion = nn.BCEWithLogitsLoss()
@@ -49,11 +49,11 @@ if __name__ == '__main__':
     print(f'\nInitialized model {type(model).__name__}\n')
 
     # If the model was properly loaded, create the checkpoint directory
-    CHECKPOINTS_PATH = os.path.join(args.root, args.cp_path, args.model)
-    os.makedirs(CHECKPOINTS_PATH, exist_ok=True)
+    checkpoints_path = os.path.join(args.root, args.cp_path, args.model)
+    os.makedirs(checkpoints_path, exist_ok=True)
 
     # Move model to GPU
-    model = model.to(DEVICE)
+    model = model.to(device)
 
     # Define the optimizer
     optimizer_params = {'lr': args.lr}
@@ -64,6 +64,6 @@ if __name__ == '__main__':
     # Start training  
     model = fit(
         model, loaders, optimizer, criterion, 
-        DEVICE, CHECKPOINTS_PATH, args.epochs
+        device, checkpoints_path, args.epochs
         )
 

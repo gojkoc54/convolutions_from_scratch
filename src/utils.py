@@ -1,3 +1,4 @@
+from cProfile import label
 import torch
 import torch.nn as nn 
 import torchvision
@@ -10,24 +11,18 @@ import numpy as np
 from models import *
 
 # TODO:
+#   - Metric tracker update !
+#   - LEARNING RATE SCHEDULE !!!
+
 #   - Handle AUGMENTATION !!!
 #   - Add logging !
-#   - LEARNING RATE SCHEDULE !!!
-#   - Metric tracker update !
 
 
 def count_parameters(model):
-    """
-    Function that counts all learnable parameters in a pytorch model 
-    """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 def get_true_parameters_count(model, alpha, img_size, num_classes):
-    """ 
-    Function that returns the expected number of parameters for each of the models,
-    as given in the paper (Table 3, Table 4, ...)
-    """
     if model == 'D-CONV':
         cnt = (9 * 2**8 + 4 * img_size[0]**2) * alpha**2 
         cnt += (27 + 64 * num_classes) * alpha 
@@ -58,14 +53,21 @@ class MetricTracker:
 
     def __init__(self):
         self.batches_cnt = 0
-        self.total_loss = 0
-        self.avg_loss = 0
+        self.total_loss, self.avg_loss = 0, 0
+        self.hits_cnt, self.samples_cnt = 0, 0
 
     def update(self, loss, preds, labels, paths=None):
         self.batches_cnt += 1
         
         self.total_loss += float(loss)
         self.avg_loss = self.total_loss / self.batches_cnt
+
+        preds_classes = preds.argmax(dim=1)
+        self.samples_cnt += labels.shape[0]
+        self.hits_cnt += (preds_classes == labels).sum()
+
+    def get_accuracy(self):
+        return 100 * (self.hits_cnt / self.samples_cnt)
 
 
 def initialize_model(model_name, model_params):
@@ -106,7 +108,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
     
     for i, data in enumerate(dataloader):
         inputs, labels = data[0].to(device), data[1].to(device)
-        labels = torch.nn.functional.one_hot(labels).to(torch.float32) 
+        labels_one_hot = torch.nn.functional.one_hot(labels).to(torch.float32) 
         
         # Reset the optimizer gradient
         optimizer.zero_grad()
@@ -114,7 +116,8 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
         # Forward pass
         preds = model(inputs)
         
-        loss = criterion(preds, labels)
+        # Calculate the loss
+        loss = criterion(preds, labels_one_hot)
         
         # Backwards pass and parameter update
         loss.backward()
@@ -130,6 +133,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
     
     print(f'\n=== TRAIN - Epoch {epoch_idx} ===')
     print(f'Avg loss = {metric_tracker.avg_loss}')
+    print(f'Accuracy = {metric_tracker.get_accuracy()}')
     print()
     
     return metric_tracker
@@ -167,6 +171,7 @@ def evaluate(model, dataloader, criterion, device, title=None):
     
     print(f'\n=== {title} ===')
     print(f'Avg loss = {metric_tracker.avg_loss}')
+    print(f'Accuracy = {metric_tracker.get_accuracy()}')
     print()
     
     return metric_tracker
