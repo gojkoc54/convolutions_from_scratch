@@ -11,11 +11,10 @@ import numpy as np
 from models import *
 
 # TODO:
-#   - Metric tracker update !
-#   - LEARNING RATE SCHEDULE !!!
-
-#   - Handle AUGMENTATION !!!
 #   - Add logging !
+
+#   - Learning rate scheduler - Cosine Annealing as in the paper
+#   - Augmentation - we won't use it
 
 
 def count_parameters(model):
@@ -73,6 +72,10 @@ class MetricTracker:
 def initialize_model(model_name, model_params):
     if model_name == 's-fc':
         model = SFC(**model_params)
+    elif model_name == 's-conv':
+        model = SConv(**model_params)
+    elif model_name == 's-local':
+        model = SLocal(**model_params)
 
     return model
 
@@ -154,12 +157,12 @@ def evaluate(model, dataloader, criterion, device, title=None):
     
     for i, data in enumerate(dataloader):
         inputs, labels = data[0].to(device), data[1].to(device)
-        labels = torch.nn.functional.one_hot(labels).to(torch.float32) 
+        labels_one_hot = torch.nn.functional.one_hot(labels).to(torch.float32)
         
         # Forward pass
         preds = model(inputs)
             
-        loss = criterion(preds, labels)
+        loss = criterion(preds, labels_one_hot)
         
         # Update the metrics
         metric_tracker.update(float(loss), preds, labels)
