@@ -7,6 +7,7 @@ from torchvision import datasets
 
 import os 
 import numpy as np
+import datetime
 
 from models import *
 from optim import BetaLASSO
@@ -16,6 +17,27 @@ from optim import BetaLASSO
 
 #   - Learning rate scheduler - Cosine Annealing as in the paper
 #   - Augmentation - we won't use it
+
+
+class Logger:
+    def __init__(self, log_filepath=None):
+        self.log_filepath = log_filepath
+        if self.log_filepath is None:
+            self.log_filepath = 'log.txt'
+
+        dir_path = os.path.dirname(self.log_filepath)
+        os.makedirs(dir_path, exist_ok=True)
+
+    def log(self, msg, to_file=True, to_console=True):
+        self.log_file = open(self.log_filepath, 'a')
+
+        if to_file:
+            self.log_file.write(f'{datetime.datetime.now()}\n')
+            self.log_file.write(f'{msg}\n\n')
+        if to_console:
+            print(msg)
+
+        self.log_file.close()
 
 
 def count_parameters(model):
@@ -86,7 +108,7 @@ def initialize_optimizer(optimizer_name, model, optimizer_params):
         optimizer = torch.optim.SGD(model.parameters(), **optimizer_params)
     elif optimizer_name == 'beta-lasso':
         optimizer = BetaLASSO(model.parameters(), **optimizer_params)
-        
+
     return optimizer
 
 
@@ -190,6 +212,11 @@ def fit(model, loaders, optimizer, criterion, device, checkpoints_path, epochs=1
         f'{type(model).__name__.lower()}_checkpoint.pt'
         )
 
+    metrics_save_path = os.path.join(
+        checkpoints_path, 
+        f'{type(model).__name__.lower()}_metrics_per_epoch.pt'
+        )   
+
     train_loader, test_loader = loaders
     metrics_per_epoch = {}
 
@@ -206,6 +233,9 @@ def fit(model, loaders, optimizer, criterion, device, checkpoints_path, epochs=1
         # Save the model checkpoint
         save_checkpoint(model, checkpoint_save_path, -1, epoch)
 
+        # Save the metrics
+        torch.save(metrics_per_epoch, metrics_save_path)
+
     # Testing on the test set
     model.load_state_dict(
         torch.load(checkpoint_save_path)['model_state_dict']
@@ -214,10 +244,6 @@ def fit(model, loaders, optimizer, criterion, device, checkpoints_path, epochs=1
     metrics_per_epoch['test'] = test_metrics
 
     # Save the metrics
-    metrics_save_path = os.path.join(
-        checkpoints_path, 
-        f'{type(model).__name__.lower()}_metrics_per_epoch.pt'
-        )    
     torch.save(metrics_per_epoch, metrics_save_path)
     print(f'\nMetrics saved to {metrics_save_path}\n')
 

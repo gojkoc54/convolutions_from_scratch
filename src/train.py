@@ -23,8 +23,12 @@ parser.add_argument('--dataset', default='cifar10', type=str)
 
 parser.add_argument('--root', default='/workspace/convs_from_scratch', type=str)
 parser.add_argument('--cp-path', default='checkpoints', type=str)
+parser.add_argument('--log-path', default='../logs/training_log.txt', type=str)
 
 args = parser.parse_args()
+
+# Global variable for the logger
+LOGGER = Logger(args.log_path)
 
 
 if __name__ == '__main__':
@@ -51,7 +55,10 @@ if __name__ == '__main__':
     print(f'\nInitialized model {type(model).__name__}\n')
 
     # If the model was properly loaded, create the checkpoint directory
-    checkpoints_path = os.path.join(args.root, args.cp_path, args.model)
+    checkpoints_path = os.path.join(
+        args.root, args.cp_path, 
+        f'{args.model}_beta_{args.beta}_lr_{args.lr}_lambda_{args.lambda_}'
+        )
     os.makedirs(checkpoints_path, exist_ok=True)
 
     # Move model to GPU
