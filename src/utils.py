@@ -9,6 +9,7 @@ import os
 import numpy as np
 
 from models import *
+from optim import BetaLASSO
 
 # TODO:
 #   - Add logging !
@@ -83,7 +84,9 @@ def initialize_model(model_name, model_params):
 def initialize_optimizer(optimizer_name, model, optimizer_params):
     if optimizer_name == 'sgd':
         optimizer = torch.optim.SGD(model.parameters(), **optimizer_params)
-
+    elif optimizer_name == 'beta-lasso':
+        optimizer = BetaLASSO(model.parameters(), **optimizer_params)
+        
     return optimizer
 
 

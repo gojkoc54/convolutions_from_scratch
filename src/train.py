@@ -11,6 +11,8 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--epochs', default=10, type=int)
 parser.add_argument('--lr', default=1e-1, type=float)
+parser.add_argument('--beta', default=1, type=float)
+parser.add_argument('--lambda_', default=1e-1, type=float)
 parser.add_argument('--bs', '--batch-size', default=512, type=int)
 parser.add_argument('--alpha', '--base-channels', default=1, type=int)
 parser.add_argument('--img-size', default=(32, 32), type=tuple)
@@ -56,7 +58,10 @@ if __name__ == '__main__':
     model = model.to(device)
 
     # Define the optimizer
-    optimizer_params = {'lr': args.lr}
+    # optimizer_params = {'lr': args.lr}
+    optimizer_params = {
+        'lr': args.lr, 'beta': args.beta, 'lambda_': args.lambda_
+        }
 
     optimizer = initialize_optimizer(args.optimizer, model, optimizer_params)
     print(f'Initialized optimizer {type(optimizer).__name__}\n')
