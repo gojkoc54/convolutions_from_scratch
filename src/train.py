@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -35,7 +36,7 @@ if __name__ == '__main__':
 
     # Define the destination device for training
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'\nDevice being used: {device}\n')
+    LOGGER.log(f'\nDevice being used: {device}\n')
     
     # Define the loss function
     criterion = nn.BCEWithLogitsLoss()
@@ -52,13 +53,12 @@ if __name__ == '__main__':
         }
 
     model = initialize_model(args.model, model_params)
-    print(f'\nInitialized model {type(model).__name__}\n')
+    LOGGER.log(f'\nInitialized model {type(model).__name__}\n')
 
     # If the model was properly loaded, create the checkpoint directory
-    checkpoints_path = os.path.join(
-        args.root, args.cp_path, 
-        f'{args.model}_beta_{args.beta}_lr_{args.lr}_lambda_{args.lambda_}'
-        )
+    checkpoint_name = f'{args.model}_beta_{args.beta}_lr_{args.lr}'
+    checkpoint_name += f'{checkpoint_name}_scheduler_lambda_{args.lambda_}'
+    checkpoints_path = os.path.join(args.root, args.cp_path, checkpoint_name)
     os.makedirs(checkpoints_path, exist_ok=True)
 
     # Move model to GPU
@@ -71,11 +71,12 @@ if __name__ == '__main__':
         }
 
     optimizer = initialize_optimizer(args.optimizer, model, optimizer_params)
-    print(f'Initialized optimizer {type(optimizer).__name__}\n')
+    LOGGER.log(f'Initialized optimizer {type(optimizer).__name__}\n')
+    lr_scheduler = CosineAnnealingLR(optimizer, args.epochs)
     
     # Start training  
     model = fit(
-        model, loaders, optimizer, criterion, 
+        model, loaders, optimizer, lr_scheduler, criterion, 
         device, checkpoints_path, args.epochs
         )
 

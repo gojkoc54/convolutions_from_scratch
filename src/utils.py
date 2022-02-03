@@ -205,7 +205,10 @@ def evaluate(model, dataloader, criterion, device, title=None):
     return metric_tracker
 
 
-def fit(model, loaders, optimizer, criterion, device, checkpoints_path, epochs=10):
+def fit(
+    model, loaders, optimizer, lr_scheduler, criterion, 
+    device, checkpoints_path, epochs=10
+    ):
     
     checkpoint_save_path = os.path.join(
         checkpoints_path, 
@@ -229,6 +232,9 @@ def fit(model, loaders, optimizer, criterion, device, checkpoints_path, epochs=1
             model, train_loader, optimizer, criterion, device, epoch
             )
         metrics_per_epoch[epoch]['train'] = train_metrics
+
+        # Update the learning rate using the LR scheduler
+        lr_scheduler.step()
 
         # Save the model checkpoint
         save_checkpoint(model, checkpoint_save_path, -1, epoch)
