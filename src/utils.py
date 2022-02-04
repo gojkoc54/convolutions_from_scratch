@@ -12,33 +12,6 @@ import datetime
 from models import *
 from optim import BetaLASSO
 
-# TODO:
-#   - Add logging !
-
-#   - Learning rate scheduler - Cosine Annealing as in the paper
-#   - Augmentation - we won't use it
-
-
-class Logger:
-    def __init__(self, log_filepath=None):
-        self.log_filepath = log_filepath
-        if self.log_filepath is None:
-            self.log_filepath = 'log.txt'
-
-        dir_path = os.path.dirname(self.log_filepath)
-        os.makedirs(dir_path, exist_ok=True)
-
-    def log(self, msg, to_file=True, to_console=True):
-        self.log_file = open(self.log_filepath, 'a')
-
-        if to_file:
-            self.log_file.write(f'{datetime.datetime.now()}\n')
-            self.log_file.write(f'{msg}\n\n')
-        if to_console:
-            print(msg)
-
-        self.log_file.close()
-
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -77,6 +50,7 @@ class MetricTracker:
         self.batches_cnt = 0
         self.total_loss, self.avg_loss = 0, 0
         self.hits_cnt, self.samples_cnt = 0, 0
+        self.non_zero_params_cnts = {'1': [], '2': [], '3': []}
 
     def update(self, loss, preds, labels, paths=None):
         self.batches_cnt += 1
@@ -87,6 +61,27 @@ class MetricTracker:
         preds_classes = preds.argmax(dim=1)
         self.samples_cnt += labels.shape[0]
         self.hits_cnt += (preds_classes == labels).sum()
+
+    def update_non_zero_params_count(self, model, layer_num):
+        sfc_layers_dict = {
+            '1': 'fc_layers.0.layers.0.weight', 
+            '2': 'fc_layers.1.0.layers.0.weight',
+            '3': 'fc_layers.1.1.weight'
+            }
+
+        model_state_dict = model.state_dict()
+
+        if layer_num in sfc_layers_dict:           
+            layer_str = sfc_layers_dict[layer_num]
+        else:
+            return 
+        
+        if layer_str not in model_state_dict:
+            return
+
+        self.non_zero_params_cnts[layer_num].append(
+            int((model_state_dict[layer_str] != 0).sum())
+            )
 
     def get_accuracy(self):
         return 100 * (self.hits_cnt / self.samples_cnt)
@@ -124,7 +119,9 @@ def save_checkpoint(model, save_path, val_loss=-1, epoch=-1):
     print(f'\nCheckpoint saved to {save_path}\n')
 
 
-def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
+def train_epoch(
+    model, dataloader, optimizer, criterion, device, epoch_idx=0, num_classes=10
+    ):
     
     # Put the model in training mode
     model.train()
@@ -136,7 +133,9 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
     
     for i, data in enumerate(dataloader):
         inputs, labels = data[0].to(device), data[1].to(device)
-        labels_one_hot = torch.nn.functional.one_hot(labels).to(torch.float32) 
+        labels_one_hot = nn.functional.one_hot(
+            labels, num_classes=num_classes
+            ).to(torch.float32) 
         
         # Reset the optimizer gradient
         optimizer.zero_grad()
@@ -158,6 +157,11 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
             msg = f'Train epoch {epoch_idx},'
             msg += f' Batch {i}/{total_batch_num}: {float(loss)}'
             print(msg)
+
+    # Update the non-zero parameter count for layers 1, 2, 3
+    metric_tracker.update_non_zero_params_count(model, '1')
+    metric_tracker.update_non_zero_params_count(model, '2')
+    metric_tracker.update_non_zero_params_count(model, '3')
     
     print(f'\n=== TRAIN - Epoch {epoch_idx} ===')
     print(f'Avg loss = {metric_tracker.avg_loss}')
@@ -167,7 +171,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch_idx=0):
     return metric_tracker
 
 
-def evaluate(model, dataloader, criterion, device, title=None):
+def evaluate(model, dataloader, criterion, device, title=None, num_classes=10):
     
     if title is None:
         title = 'VALIDATION'
@@ -182,7 +186,9 @@ def evaluate(model, dataloader, criterion, device, title=None):
     
     for i, data in enumerate(dataloader):
         inputs, labels = data[0].to(device), data[1].to(device)
-        labels_one_hot = torch.nn.functional.one_hot(labels).to(torch.float32)
+        labels_one_hot = nn.functional.one_hot(
+            labels, num_classes=num_classes
+            ).to(torch.float32)
         
         # Forward pass
         preds = model(inputs)
@@ -207,7 +213,7 @@ def evaluate(model, dataloader, criterion, device, title=None):
 
 def fit(
     model, loaders, optimizer, lr_scheduler, criterion, 
-    device, checkpoints_path, epochs=10
+    device, checkpoints_path, epochs=10, num_classes=10
     ):
     
     checkpoint_save_path = os.path.join(
@@ -229,7 +235,8 @@ def fit(
         metrics_per_epoch[epoch] = {}
         
         train_metrics = train_epoch(
-            model, train_loader, optimizer, criterion, device, epoch
+            model, train_loader, optimizer, criterion, 
+            device, epoch, num_classes=num_classes
             )
         metrics_per_epoch[epoch]['train'] = train_metrics
 
@@ -246,7 +253,9 @@ def fit(
     model.load_state_dict(
         torch.load(checkpoint_save_path)['model_state_dict']
         )
-    test_metrics = evaluate(model, test_loader, criterion, device, 'TESTING')
+    test_metrics = evaluate(
+        model, test_loader, criterion, device, 'TESTING', num_classes
+        )
     metrics_per_epoch['test'] = test_metrics
 
     # Save the metrics
@@ -275,6 +284,7 @@ def load_datasets(dataset_str='cifar10', batch_size=256, num_workers=0):
             '../data/cifar', train=False, transform=test_transform, download=True
             )
         num_classes = 10
+    
     elif dataset_str == 'cifar100':
         train_data = datasets.CIFAR100(
             '../data/cifar', train=True, transform=train_transform, download=True
@@ -283,6 +293,17 @@ def load_datasets(dataset_str='cifar10', batch_size=256, num_workers=0):
             '../data/cifar', train=False, transform=test_transform, download=True
             )
         num_classes = 100
+    
+    elif dataset_str == 'svhn':
+        train_data = datasets.SVHN(
+            root='../data/svhn', split='train', 
+            transform=train_transform, download=True
+            )
+        test_data = datasets.SVHN(
+            root='../data/svhn', split='test', 
+            transform=train_transform, download=True
+            )
+        num_classes = 10
 
     train_loader = torch.utils.data.DataLoader(
         train_data,

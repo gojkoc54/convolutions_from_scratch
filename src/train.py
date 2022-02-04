@@ -28,15 +28,12 @@ parser.add_argument('--log-path', default='../logs/training_log.txt', type=str)
 
 args = parser.parse_args()
 
-# Global variable for the logger
-LOGGER = Logger(args.log_path)
-
 
 if __name__ == '__main__':
 
     # Define the destination device for training
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    LOGGER.log(f'\nDevice being used: {device}\n')
+    print(f'\nDevice being used: {device}\n')
     
     # Define the loss function
     criterion = nn.BCEWithLogitsLoss()
@@ -53,7 +50,7 @@ if __name__ == '__main__':
         }
 
     model = initialize_model(args.model, model_params)
-    LOGGER.log(f'\nInitialized model {type(model).__name__}\n')
+    print(f'\nInitialized model {type(model).__name__}\n')
 
     # If the model was properly loaded, create the checkpoint directory
     checkpoint_name = f'{args.model}_beta_{args.beta}_lr_{args.lr}'
@@ -71,7 +68,7 @@ if __name__ == '__main__':
         }
 
     optimizer = initialize_optimizer(args.optimizer, model, optimizer_params)
-    LOGGER.log(f'Initialized optimizer {type(optimizer).__name__}\n')
+    print(f'Initialized optimizer {type(optimizer).__name__}\n')
     lr_scheduler = CosineAnnealingLR(optimizer, args.epochs)
     
     # Start training  
