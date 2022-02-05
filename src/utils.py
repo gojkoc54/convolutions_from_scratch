@@ -1,4 +1,3 @@
-from cProfile import label
 import torch
 import torch.nn as nn 
 import torchvision
@@ -7,52 +6,28 @@ from torchvision import datasets
 
 import os 
 import numpy as np
-import datetime
 
 from models import *
 from optim import BetaLASSO
 
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
-def get_true_parameters_count(model, alpha, img_size, num_classes):
-    if model == 'D-CONV':
-        cnt = (9 * 2**8 + 4 * img_size[0]**2) * alpha**2 
-        cnt += (27 + 64 * num_classes) * alpha 
-    
-    elif model == 'S-CONV':
-        cnt = 6 * img_size[0]**2 * alpha**2 + (243 + 24 * num_classes) * alpha
-    
-    elif model == 'D-FC':
-        cnt = (img_size[0]**4 + 4 * img_size[0]**2) * alpha**2
-        cnt += (3 * img_size[0]**4 + 64 * num_classes) * alpha
-
-    elif model == 'S-FC':
-        cnt = 6 * img_size[0]**2 * alpha**2 
-        cnt += (3 * img_size[0]**4 / 4 + 24 * num_classes) * alpha
-
-    elif model == 'D-LOCAL':
-        cnt = 13 * img_size[0]**2 * alpha**2
-        cnt += (27 * img_size[0]**2 + 64 * num_classes) * alpha
-
-    elif model == 'S-LOCAL':
-        cnt = 6 * img_size[0]**2 * alpha**2 
-        cnt += (243 * img_size[0]**2 / 4 + 24 * num_classes) * alpha
-
-    return cnt 
-
-
 class MetricTracker:
-
+    """
+    Class that helps track all the important metrics during model training.
+    Usually we'll have one MetricTracker per epoch, i.e. initialize a new one 
+    on the beginning of every epoch and save it before starting a new one.
+    """
     def __init__(self):
         self.batches_cnt = 0
         self.total_loss, self.avg_loss = 0, 0
         self.hits_cnt, self.samples_cnt = 0, 0
         self.non_zero_params_cnts = {'1': [], '2': [], '3': []}
 
-    def update(self, loss, preds, labels, paths=None):
+    def update(self, loss, preds, labels):
+        """
+        Updates the metrics - number of batches that passed, total loss, average
+        loss, accuracy (i.e. the number of correctly predicted samples so far).
+        """
         self.batches_cnt += 1
         
         self.total_loss += float(loss)
@@ -63,6 +38,10 @@ class MetricTracker:
         self.hits_cnt += (preds_classes == labels).sum()
 
     def update_non_zero_params_count(self, model, layer_num):
+        """
+        Updates the number of non-zero parameters in the desired layer.
+        Useful for reconstructing Figure 3.
+        """
         sfc_layers_dict = {
             '1': 'fc_layers.0.layers.0.weight', 
             '2': 'fc_layers.1.0.layers.0.weight',
@@ -87,7 +66,12 @@ class MetricTracker:
         return 100 * (self.hits_cnt / self.samples_cnt)
 
 
+
 def initialize_model(model_name, model_params):
+    """
+    Returns the model object, given a string 
+    identifier and the model's hyperparameters
+    """
     if model_name == 's-fc':
         model = SFC(**model_params)
     elif model_name == 's-conv':
@@ -96,6 +80,7 @@ def initialize_model(model_name, model_params):
         model = SLocal(**model_params)
 
     return model
+
 
 
 def initialize_optimizer(optimizer_name, model, optimizer_params):
@@ -115,7 +100,6 @@ def save_checkpoint(model, save_path, val_loss=-1, epoch=-1):
         },
         save_path
         )
-
     print(f'\nCheckpoint saved to {save_path}\n')
 
 

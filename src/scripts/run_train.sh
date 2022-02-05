@@ -9,13 +9,13 @@ for model in "${models[@]}"
 do
     # Basic SGD
     python train.py --model ${model} --dataset $DATASET --optimizer beta-lasso \
-        --epochs $EPOCHS --lr $LR --beta 0 --lambda_ 0 
+        --epochs $EPOCHS --lr $LR --beta 0 --lambda_ 0 --cp-path checkpoints/${DATASET}
 
     # Beta-LASSO
-	for beta in "${beta_array[@]}"
+    for beta in "${beta_array[@]}"
     do
         python train.py --model ${model} --dataset $DATASET --optimizer beta-lasso \
-            --epochs $EPOCHS --lr $LR --beta $beta --lambda_ $LAMBDA
+            --epochs $EPOCHS --lr $LR --beta $beta --lambda_ $LAMBDA --cp-path checkpoints/${DATASET}
     done
 done
 

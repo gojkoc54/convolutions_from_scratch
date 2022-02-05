@@ -55,14 +55,14 @@ if __name__ == '__main__':
     # If the model was properly loaded, create the checkpoint directory
     checkpoint_name = f'{args.model}_beta_{args.beta}_lr_{args.lr}'
     checkpoint_name += f'{checkpoint_name}_scheduler_lambda_{args.lambda_}'
+    checkpoint_name += f'{checkpoint_name}_ep_{args.epochs}'
     checkpoints_path = os.path.join(args.root, args.cp_path, checkpoint_name)
     os.makedirs(checkpoints_path, exist_ok=True)
 
     # Move model to GPU
     model = model.to(device)
 
-    # Define the optimizer
-    # optimizer_params = {'lr': args.lr}
+    # Initialize the optimizer
     optimizer_params = {
         'lr': args.lr, 'beta': args.beta, 'lambda_': args.lambda_
         }

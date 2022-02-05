@@ -3,6 +3,15 @@ from torch.optim.optimizer import Optimizer, required
 import copy
 
 class BetaLASSO(Optimizer):
+    """
+    Implementation of the proposed Beta-LASSO optimizer algorithm.
+    The implementation is a combination of 3 parts:
+        - basic SGD step (theta_new = theta - lr * d_theta)
+        - L1 regularization (theta = theta + lambda * sign(theta))
+        - Thresholding - everything in the range 
+            [-lambda * beta, lambda * beta] becomes 0
+
+    """
     def __init__(self, params, beta, lr, lambda_):
         defaults = dict(lr=lr, beta=beta, lambda_=lambda_)
         super(BetaLASSO, self).__init__(params, defaults)
